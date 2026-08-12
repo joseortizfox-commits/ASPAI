@@ -4,12 +4,12 @@ try{
   /* ============================= DATA ============================= */
 
   var CATS = {
-    flour: { label:'Harina', color:'#E3A83B' },
-    water: { label:'Agua', color:'#6C93AC' },
-    salt: { label:'Sal', color:'#9C9184' },
-    leaven: { label:'Levadura / M. madre', color:'#7C8A4E' },
-    fat: { label:'Grasa / Aceite', color:'#B06B3C' },
-    other: { label:'Otro', color:'#8C7B6B' }
+    flour: { label:'Flour', color:'#E3A83B' },
+    water: { label:'Water', color:'#6C93AC' },
+    salt: { label:'Salt', color:'#9C9184' },
+    leaven: { label:'Yeast / Starter', color:'#7C8A4E' },
+    fat: { label:'Fat / Oil', color:'#B06B3C' },
+    other: { label:'Other', color:'#8C7B6B' }
   };
 
   function uid(p){ return (p||'id') + '_' + Math.random().toString(36).slice(2,9); }
@@ -400,7 +400,7 @@ try{
     });
   }
 
-  /* ============================= RECETAS AÑADIDAS (lote 3) ============================= */
+  /* ============================= ADDED RECIPES (batch 3) ============================= */
 
   function extraRecipesV3(){
     return [
@@ -635,17 +635,13 @@ try{
       }
 
       if (version < 3){
-        // Renombra recetas existentes según los nuevos nombres.
         state.recipes.forEach(function(r){
           if (RENAME_MAP_V3.hasOwnProperty(r.name)) r.name = RENAME_MAP_V3[r.name];
         });
-        // Añade Focaccia y Burger si aún no existen.
         var namesNow = state.recipes.map(function(r){ return r.name; });
         extraRecipesV3().forEach(function(r){
           if (namesNow.indexOf(r.name) === -1) state.recipes.push(r);
         });
-        // Reordena según ORDER_V3; lo que no esté en la lista va al final,
-        // manteniendo su orden relativo.
         state.recipes.sort(function(a, b){
           var ia = ORDER_V3.indexOf(a.name); if (ia === -1) ia = 999;
           var ib = ORDER_V3.indexOf(b.name); if (ib === -1) ib = 999;
@@ -655,8 +651,8 @@ try{
       }
 
       if (version < 4){
-        // Todas las recetas que existían antes de la división Panadería/Pastelería
-        // se marcan como "panadería" para no perder su ubicación.
+        // Every recipe that existed before the Bakery/Pastry split
+        // is marked as "panaderia" (bakery) so nothing goes missing.
         state.recipes.forEach(function(r){
           if (!r.division) r.division = 'panaderia';
         });
@@ -684,18 +680,18 @@ try{
     }).catch(function(){});
   }
 
-  /* ============================= ALMACENAMIENTO (localStorage) ============================= */
+  /* ============================= STORAGE (localStorage) ============================= */
 
-  // Pequeño adaptador que imita la forma de la antigua API window.storage
-  // (get/set devolviendo promesas con {key, value}) pero usando el
-  // almacenamiento local del navegador (localStorage), que es síncrono
-  // y guarda los datos únicamente en este navegador/dispositivo.
+  // Small adapter that mimics the shape of the previous window.storage API
+  // (get/set returning promises with {key, value}) but backed by the
+  // browser's local storage (localStorage), which is synchronous and only
+  // saves data on this browser/device.
   var storage = {
     get: function(key){
       return new Promise(function(resolve, reject){
         try{
           var raw = window.localStorage.getItem(key);
-          if (raw === null){ reject(new Error('Clave no encontrada: ' + key)); return; }
+          if (raw === null){ reject(new Error('Key not found: ' + key)); return; }
           resolve({ key: key, value: raw });
         }catch(e){ reject(e); }
       });
@@ -809,12 +805,6 @@ try{
   App.selectRecipe = function(id){ state.activeId = id; render(); };
   App.setDivision = function(d){
     state.division = d;
-    ensureActiveInDivision();
-    render();
-  };
-
-  App.setDivision = function(d){
-    state.division = d;
     state.subdivision = null;
     ensureActiveInDivision();
     render();
@@ -826,7 +816,7 @@ try{
   };
 
   App.newRecipe = function(){
-    var r = { id: uid('r'), name:'Nueva receta', notes:'', pieceWeight:500, pieceCount:2,
+    var r = { id: uid('r'), name:'New recipe', notes:'', pieceWeight:500, pieceCount:2,
       division: state.division,
       subdivision: (state.division==='pasteleria' && state.subdivision) ? state.subdivision : undefined,
       ingredients:[{id:uid('i'), name:'Harina de fuerza', grams:1000, cat:'flour'},
@@ -842,7 +832,7 @@ try{
   };
 
   App.newBlankRecipe = function(){
-    var r = { id: uid('r'), name:'Receta en blanco', notes:'', pieceWeight:0, pieceCount:0,
+    var r = { id: uid('r'), name:'Blank recipe', notes:'', pieceWeight:0, pieceCount:0,
       division: state.division,
       subdivision: (state.division==='pasteleria' && state.subdivision) ? state.subdivision : undefined,
       ingredients:[
@@ -867,7 +857,7 @@ try{
   App.duplicateRecipe = function(id){
     var r = getRecipe(id); if(!r) return;
     var copy = JSON.parse(JSON.stringify(r));
-    copy.id = uid('r'); copy.name = r.name + ' (copia)';
+    copy.id = uid('r'); copy.name = r.name + ' (copy)';
     copy.ingredients.forEach(function(i){ i.id = uid('i'); });
     copy.schedule.forEach(function(s){ s.id = uid('s'); });
     state.recipes.push(copy);
@@ -877,7 +867,7 @@ try{
   };
 
   App.deleteRecipe = function(id){
-    if (!confirm('¿Eliminar esta receta? No se puede deshacer.')) return;
+    if (!confirm('Delete this recipe? This cannot be undone.')) return;
     state.recipes = state.recipes.filter(function(r){ return r.id!==id; });
     if (state.activeId === id) ensureActiveInDivision();
     persistRecipes();
@@ -894,7 +884,7 @@ try{
 
   App.addIngredient = function(rid){
     var r = getRecipe(rid); if(!r) return;
-    r.ingredients.push({id:uid('i'), name:'Nuevo ingrediente', grams:0, cat:'other'});
+    r.ingredients.push({id:uid('i'), name:'New ingredient', grams:0, cat:'other'});
     persistRecipes();
     render();
   };
@@ -948,7 +938,7 @@ try{
         beep();
         try{
           if (window.Notification && Notification.permission === 'granted'){
-            new Notification('Temporizador finalizado');
+            new Notification('Timer finished');
           }
         }catch(e){}
         render();
@@ -1001,7 +991,7 @@ try{
     render();
   };
   App.addPantryItem = function(){
-    var name = 'Ingrediente ' + (Object.keys(state.pantry).length+1);
+    var name = 'Ingredient ' + (Object.keys(state.pantry).length+1);
     state.pantry[name] = 0;
     persistPantry();
     render();
@@ -1021,11 +1011,10 @@ try{
     render();
   };
 
-  /* ============================= SINCRONIZAR ENTRE DISPOSITIVOS ============================= */
-  // localStorage guarda los datos solo en este navegador/dispositivo. Para pasarlos
-  // a otro dispositivo, exporta un archivo aquí e impórtalo allí (por email, Drive,
-  // AirDrop, USB...). No es sincronización automática en tiempo real, pero funciona
-  // sin necesidad de ningún servidor.
+  /* ============================= SYNC BETWEEN DEVICES ============================= */
+  // localStorage only saves data on this browser/device. To move it to another
+  // device, export a file here and import it there (via email, Drive, AirDrop,
+  // USB drive...). This isn't real-time automatic sync, but it needs no server.
 
   App.exportData = function(){
     var payload = {
@@ -1054,14 +1043,14 @@ try{
       try{
         var data = JSON.parse(e.target.result);
         if (!data || !Array.isArray(data.recipes)){
-          alert('Ese archivo no parece un backup válido de Aspai.');
+          alert('That file does not look like a valid Aspai backup.');
           inputEl.value = '';
           return;
         }
         var replace = confirm(
-          'Vas a importar ' + data.recipes.length + ' receta(s).\n\n' +
-          'Aceptar = reemplazar todos tus datos actuales por los del archivo.\n' +
-          'Cancelar = combinar (se añaden las recetas nuevas, sin borrar las que ya tienes).'
+          'You are about to import ' + data.recipes.length + ' recipe(s).\n\n' +
+          'OK = replace all your current data with the file\'s data.\n' +
+          'Cancel = merge (new recipes are added, existing ones are kept).'
         );
         if (replace){
           state.recipes = data.recipes;
@@ -1078,9 +1067,9 @@ try{
         persistRecipes();
         persistPantry();
         render();
-        alert('Datos importados correctamente.');
+        alert('Data imported successfully.');
       }catch(err){
-        alert('No se pudo leer el archivo: ' + err.message);
+        alert('Could not read the file: ' + err.message);
       }
       inputEl.value = '';
     };
@@ -1112,7 +1101,7 @@ try{
   }
 
   function divisionLabel(d){
-    return d==='pasteleria' ? 'pastelería' : 'panadería';
+    return d==='pasteleria' ? 'pastry' : 'bakery';
   }
 
   function gauge(pct){
@@ -1123,7 +1112,20 @@ try{
       '<circle cx="55" cy="55" r="'+r+'" stroke="#382B1D" stroke-width="9" fill="none"/>'+
       '<circle cx="55" cy="55" r="'+r+'" stroke="#6C93AC" stroke-width="9" fill="none" stroke-linecap="round" '+
       'stroke-dasharray="'+c+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 55 55)"/>'+
-      '</svg><div class="gm-gauge-label"><b>'+fmt(pct,1)+'%</b><span>Hidratación</span></div></div>';
+      '</svg><div class="gm-gauge-label"><b>'+fmt(pct,1)+'%</b><span>Hydration</span></div></div>';
+  }
+
+  function subdivisionPicker(){
+    if (state.division !== 'pasteleria') return '';
+    var subs = subdivisionsInDivision('pasteleria');
+    if (!subs.length) return '';
+    var out = '<div class="gm-recipe-pick" style="margin-bottom:10px;">';
+    out += '<button class="gm-recipe-btn '+(!state.subdivision?'active':'')+'" onclick="App.setSubdivision(null)">All</button>';
+    subs.forEach(function(s){
+      out += '<button class="gm-recipe-btn '+(state.subdivision===s?'active':'')+'" onclick="App.setSubdivision(\''+s+'\')">'+s+'</button>';
+    });
+    out += '</div>';
+    return out;
   }
 
   function recipePicker(){
@@ -1141,8 +1143,8 @@ try{
   function renderCalc(){
     var r = getRecipe(state.activeId);
     if (!r){
-      return '<div class="gm-card"><div class="gm-empty">'+icon('empty')+'<div>No tienes recetas de '+divisionLabel(state.division)+' todavía.</div>'+
-        '<div style="margin-top:10px;"><button class="gm-primary" onclick="App.newRecipe()">Crear receta</button></div></div></div>';
+      return '<div class="gm-card"><div class="gm-empty">'+icon('empty')+'<div>You don\'t have any '+divisionLabel(state.division)+' recipes yet.</div>'+
+        '<div style="margin-top:10px;"><button class="gm-primary" onclick="App.newRecipe()">Create recipe</button></div></div></div>';
     }
     var tf = totalFlour(r), td = totalDough(r), hyd = hydration(r);
 
@@ -1160,38 +1162,38 @@ try{
           gauge(hyd)+
           '<div>'+
             '<h2 style="margin-bottom:2px;">'+r.name+'</h2>'+
-            '<p class="gm-sub" style="margin-bottom:8px;">'+(r.notes||'Sin notas')+'</p>'+
+            '<p class="gm-sub" style="margin-bottom:8px;">'+(r.notes||'No notes')+'</p>'+
             '<div class="gm-row" style="gap:18px;">'+
-              '<div><div class="gm-mono" style="font-size:18px;color:var(--gold);">'+fmt(tf,0)+' g</div><div class="gm-sub" style="margin:0;">Harina total</div></div>'+
-              '<div><div class="gm-mono" style="font-size:18px;">'+fmt(td,0)+' g</div><div class="gm-sub" style="margin:0;">Masa total</div></div>'+
+              '<div><div class="gm-mono" style="font-size:18px;color:var(--gold);">'+fmt(tf,0)+' g</div><div class="gm-sub" style="margin:0;">Total flour</div></div>'+
+              '<div><div class="gm-mono" style="font-size:18px;">'+fmt(td,0)+' g</div><div class="gm-sub" style="margin:0;">Total dough</div></div>'+
             '</div>'+
           '</div>'+
         '</div>'+
       '</div>'+
 
       '<div class="gm-card">'+
-        '<h2>Porcentaje panadero</h2>'+
-        '<p class="gm-sub">Cada ingrediente como % del peso total de harina.</p>'+
-        '<table class="gm-table"><thead><tr><th>Ingrediente</th><th>Tipo</th><th>Peso</th><th>%</th></tr></thead>'+
+        '<h2>Baker\'s percentage</h2>'+
+        '<p class="gm-sub">Each ingredient as % of total flour weight.</p>'+
+        '<table class="gm-table"><thead><tr><th>Ingredient</th><th>Type</th><th>Weight</th><th>%</th></tr></thead>'+
         '<tbody>'+rows+'</tbody></table>'+
       '</div>'+
 
       '<div class="gm-card">'+
-        '<h2>Escalar receta</h2>'+
-        '<p class="gm-sub">Recalcula todos los ingredientes manteniendo los porcentajes exactos.</p>'+
+        '<h2>Scale recipe</h2>'+
+        '<p class="gm-sub">Recalculates every ingredient while keeping the exact percentages.</p>'+
         '<div class="gm-row" id="scaleControls">'+
-          '<div class="gm-field"><label>Escalar por</label>'+
+          '<div class="gm-field"><label>Scale by</label>'+
             '<select onchange="App.setScaleMode(this.value)">'+
-              '<option value="flour" '+(state.scaleMode==='flour'?'selected':'')+'>Peso de harina</option>'+
-              '<option value="total" '+(state.scaleMode==='total'?'selected':'')+'>Peso total de masa</option>'+
-              '<option value="units" '+(state.scaleMode==='units'?'selected':'')+'>Nº de piezas</option>'+
+              '<option value="flour" '+(state.scaleMode==='flour'?'selected':'')+'>Flour weight</option>'+
+              '<option value="total" '+(state.scaleMode==='total'?'selected':'')+'>Total dough weight</option>'+
+              '<option value="units" '+(state.scaleMode==='units'?'selected':'')+'>Number of pieces</option>'+
             '</select>'+
           '</div>'+
           (state.scaleMode==='units' ? (
-            '<div class="gm-field"><label>Peso por pieza (g)</label><input type="number" value="'+r.pieceWeight+'" oninput="App.updateRecipeField(\''+r.id+'\',\'pieceWeight\',this.value)" style="width:110px;"></div>'+
-            '<div class="gm-field"><label>Nº de piezas</label><input type="number" value="'+state.scaleUnits+'" oninput="App.setScaleUnits(this.value)" style="width:90px;"></div>'
+            '<div class="gm-field"><label>Weight per piece (g)</label><input type="number" value="'+r.pieceWeight+'" oninput="App.updateRecipeField(\''+r.id+'\',\'pieceWeight\',this.value)" style="width:110px;"></div>'+
+            '<div class="gm-field"><label>Number of pieces</label><input type="number" value="'+state.scaleUnits+'" oninput="App.setScaleUnits(this.value)" style="width:90px;"></div>'
           ) : (
-            '<div class="gm-field"><label>'+(state.scaleMode==='flour'?'Harina objetivo (g)':'Masa total objetivo (g)')+'</label>'+
+            '<div class="gm-field"><label>'+(state.scaleMode==='flour'?'Target flour (g)':'Target total dough (g)')+'</label>'+
             '<input type="number" value="'+state.scaleValue+'" oninput="App.setScaleValue(this.value)" style="width:130px;"></div>'
           ))+
         '</div>'+
@@ -1214,7 +1216,7 @@ try{
       var targetTotal = (r.pieceWeight||0) * (state.scaleUnits||0);
       factor = td>0 ? (targetTotal/td) : 0;
     }
-    if (!isFinite(factor) || factor<=0){ host.innerHTML = '<p class="gm-sub">Introduce un valor válido.</p>'; return; }
+    if (!isFinite(factor) || factor<=0){ host.innerHTML = '<p class="gm-sub">Enter a valid value.</p>'; return; }
 
     var rows = r.ingredients.map(function(ing){
       return '<tr><td>'+ing.name+'</td><td class="gm-grams">'+fmt(ing.grams,1)+' g</td>'+
@@ -1222,24 +1224,11 @@ try{
     }).join('');
     var newTotal = td*factor;
 
-    host.innerHTML = '<table class="gm-table"><thead><tr><th>Ingrediente</th><th>Original</th><th></th><th>Escalado</th></tr></thead>'+
+    host.innerHTML = '<table class="gm-table"><thead><tr><th>Ingredient</th><th>Original</th><th></th><th>Scaled</th></tr></thead>'+
       '<tbody>'+rows+'</tbody></table>'+
       '<div class="gm-row" style="margin-top:10px;justify-content:space-between;">'+
-        '<span class="gm-sub" style="margin:0;">Masa total resultante: <b class="gm-mono" style="color:var(--text);">'+fmt(newTotal,0)+' g</b></span>'+
+        '<span class="gm-sub" style="margin:0;">Resulting total dough: <b class="gm-mono" style="color:var(--text);">'+fmt(newTotal,0)+' g</b></span>'+
       '</div>';
-  }
-
-  function subdivisionPicker(){
-    if (state.division !== 'pasteleria') return '';
-    var subs = subdivisionsInDivision('pasteleria');
-    if (!subs.length) return '';
-    var out = '<div class="gm-recipe-pick" style="margin-bottom:10px;">';
-    out += '<button class="gm-recipe-btn '+(!state.subdivision?'active':'')+'" onclick="App.setSubdivision(null)">Todas</button>';
-    subs.forEach(function(s){
-      out += '<button class="gm-recipe-btn '+(state.subdivision===s?'active':'')+'" onclick="App.setSubdivision(\''+s+'\')">'+s+'</button>';
-    });
-    out += '</div>';
-    return out;
   }
 
   function renderRecipes(){
@@ -1247,16 +1236,16 @@ try{
     var list = visibleRecipes();
     var out = '<div class="gm-card">'+
       '<div class="gm-row" style="justify-content:space-between;">'+
-        '<h2 style="margin:0;text-transform:capitalize;">Tus recetas de '+divisionLabel(state.division)+'</h2>'+
+        '<h2 style="margin:0;text-transform:capitalize;">Your '+divisionLabel(state.division)+' recipes</h2>'+
         '<div class="gm-row" style="gap:6px;">'+
-          '<button class="gm-small" onclick="App.newBlankRecipe()">+ Tabla en blanco</button>'+
-          '<button class="gm-primary gm-small" onclick="App.newRecipe()">+ Nueva receta</button>'+
+          '<button class="gm-small" onclick="App.newBlankRecipe()">+ Blank table</button>'+
+          '<button class="gm-primary gm-small" onclick="App.newRecipe()">+ New recipe</button>'+
         '</div>'+
       '</div>'+
       (list.length ? '<div style="margin-top:12px;">'+recipePicker()+'</div>' :
         subdivisionPicker() +
-        '<p class="gm-sub" style="margin-top:12px;">No hay recetas de '+divisionLabel(state.division)+
-        (state.subdivision ? (' en "'+state.subdivision+'"') : '')+' todavía.</p>')+
+        '<p class="gm-sub" style="margin-top:12px;">No '+divisionLabel(state.division)+
+        (state.subdivision ? (' in "'+state.subdivision+'"') : '')+' recipes yet.</p>')+
     '</div>';
 
     if (!r) return out;
@@ -1275,21 +1264,21 @@ try{
         '<input type="text" class="gm-serif" value="'+r.name+'" onchange="App.updateRecipeField(\''+r.id+'\',\'name\',this.value)" '+
           'style="font-size:19px;font-weight:600;background:none;border:none;padding:2px 0;font-family:Fraunces,serif;flex:1;min-width:180px;">'+
         '<div class="gm-row" style="gap:6px;">'+
-          '<button class="gm-small" onclick="App.duplicateRecipe(\''+r.id+'\')">Duplicar</button>'+
-          '<button class="gm-small" onclick="App.deleteRecipe(\''+r.id+'\')" style="color:var(--danger);">Eliminar</button>'+
+          '<button class="gm-small" onclick="App.duplicateRecipe(\''+r.id+'\')">Duplicate</button>'+
+          '<button class="gm-small" onclick="App.deleteRecipe(\''+r.id+'\')" style="color:var(--danger);">Delete</button>'+
         '</div>'+
       '</div>'+
-      '<textarea onchange="App.updateRecipeField(\''+r.id+'\',\'notes\',this.value)" placeholder="Notas de la receta..." '+
+      '<textarea onchange="App.updateRecipeField(\''+r.id+'\',\'notes\',this.value)" placeholder="Recipe notes..." '+
         'style="width:100%;margin-top:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:8px;font-family:Inter,sans-serif;font-size:13px;min-height:44px;">'+(r.notes||'')+'</textarea>'+
       (state.division==='pasteleria' ?
-        '<div class="gm-field" style="margin-top:10px;max-width:240px;"><label>Subcategoría (ej. Bizcochos)</label>'+
-        '<input type="text" value="'+(r.subdivision||'')+'" placeholder="Sin subcategoría" '+
+        '<div class="gm-field" style="margin-top:10px;max-width:240px;"><label>Subcategory (e.g. Sponge cakes)</label>'+
+        '<input type="text" value="'+(r.subdivision||'')+'" placeholder="No subcategory" '+
         'onchange="App.updateRecipeField(\''+r.id+'\',\'subdivision\',this.value)"></div>' : '')+
 
-      '<h2 style="margin-top:18px;">Ingredientes</h2>'+
-      '<table class="gm-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Peso</th><th></th></tr></thead>'+
+      '<h2 style="margin-top:18px;">Ingredients</h2>'+
+      '<table class="gm-table"><thead><tr><th>Name</th><th>Type</th><th>Weight</th><th></th></tr></thead>'+
       '<tbody>'+ingRows+'</tbody></table>'+
-      '<button class="gm-small" style="margin-top:10px;" onclick="App.addIngredient(\''+r.id+'\')">+ Añadir ingrediente</button>'+
+      '<button class="gm-small" style="margin-top:10px;" onclick="App.addIngredient(\''+r.id+'\')">+ Add ingredient</button>'+
     '</div>';
 
     return out;
@@ -1306,7 +1295,7 @@ try{
     var body = '';
     days.forEach(function(day){
       body += '<div class="gm-day-group"><div class="gm-day-title">'+day+'</div>';
-      body += '<div class="gm-sched-head"><div>Hora</div><div>Paso</div><div>Amasado</div><div>Temp. masa</div><div>Duración</div><div class="gm-sched-cell-hide">Notas</div><div></div></div>';
+      body += '<div class="gm-sched-head"><div>Time</div><div>Step</div><div>Kneading</div><div>Dough temp.</div><div>Duration</div><div class="gm-sched-cell-hide">Notes</div><div></div></div>';
       r.schedule.filter(function(s){return s.dia===day;}).forEach(function(s){
         var t = timers[s.id];
         var running = t && t.interval;
@@ -1320,8 +1309,8 @@ try{
             '<input type="number" value="'+s.min+'" onchange="App.updateSched(\''+r.id+'\',\''+s.id+'\',\'min\',this.value); App.resetTimer(\''+s.id+'\', Number(this.value))" style="width:44px;">'+
             '<span id="timer_'+s.id+'" class="gm-timer-display">'+mmss(remaining)+'</span>'+
             (running ?
-              '<button class="gm-ghost gm-small" title="Pausar" onclick="App.pauseTimer(\''+s.id+'\')">⏸</button>' :
-              '<button class="gm-ghost gm-small" title="Iniciar" onclick="App.startTimer(\''+s.id+'\', '+s.min+')">▶</button>')+
+              '<button class="gm-ghost gm-small" title="Pause" onclick="App.pauseTimer(\''+s.id+'\')">⏸</button>' :
+              '<button class="gm-ghost gm-small" title="Start" onclick="App.startTimer(\''+s.id+'\', '+s.min+')">▶</button>')+
           '</div>'+
           '<div class="gm-sched-cell-hide"><input type="text" value="'+(s.notas||'')+'" onchange="App.updateSched(\''+r.id+'\',\''+s.id+'\',\'notas\',this.value)" style="width:100%;"></div>'+
           '<button class="gm-ghost" onclick="App.deleteSched(\''+r.id+'\',\''+s.id+'\')">✕</button>'+
@@ -1332,11 +1321,11 @@ try{
 
     out += '<div class="gm-card">'+
       '<div class="gm-row" style="justify-content:space-between;">'+
-        '<div><h2 style="margin:0;">Cronograma — '+r.name+'</h2><p class="gm-sub">Planifica amasados, reposos y horneado día a día. Los avisos suenan aunque cambies de pestaña dentro de la app.</p></div>'+
-        '<button class="gm-small" onclick="App.requestNotif()">Activar avisos del navegador</button>'+
+        '<div><h2 style="margin:0;">Schedule — '+r.name+'</h2><p class="gm-sub">Plan kneading, rests and baking day by day. Alerts sound even if you switch tabs within the app.</p></div>'+
+        '<button class="gm-small" onclick="App.requestNotif()">Enable browser alerts</button>'+
       '</div>'+
-      (body || '<p class="gm-sub">Sin pasos todavía.</p>')+
-      '<button class="gm-small" style="margin-top:6px;" onclick="App.addSchedRow(\''+r.id+'\')">+ Añadir paso</button>'+
+      (body || '<p class="gm-sub">No steps yet.</p>')+
+      '<button class="gm-small" style="margin-top:6px;" onclick="App.addSchedRow(\''+r.id+'\')">+ Add step</button>'+
     '</div>';
 
     return out;
@@ -1356,13 +1345,13 @@ try{
 
     var out = '<div class="gm-card">'+
       '<div class="gm-row" style="justify-content:space-between;">'+
-        '<div><h2 style="margin:0;">Despensa</h2><p class="gm-sub">Precio por kilo de cada ingrediente, para calcular el coste de tus recetas.</p></div>'+
+        '<div><h2 style="margin:0;">Pantry</h2><p class="gm-sub">Price per kilo of each ingredient, to calculate the cost of your recipes.</p></div>'+
         '<div class="gm-row" style="gap:6px;">'+
-          '<button class="gm-small" onclick="App.detectIngredients()">Detectar de recetas</button>'+
-          '<button class="gm-small gm-primary" onclick="App.addPantryItem()">+ Añadir</button>'+
+          '<button class="gm-small" onclick="App.detectIngredients()">Detect from recipes</button>'+
+          '<button class="gm-small gm-primary" onclick="App.addPantryItem()">+ Add</button>'+
         '</div>'+
       '</div>'+
-      (rows ? '<div style="margin-top:10px;">'+rows+'</div>' : '<p class="gm-sub" style="margin-top:10px;">Aún no has añadido precios.</p>')+
+      (rows ? '<div style="margin-top:10px;">'+rows+'</div>' : '<p class="gm-sub" style="margin-top:10px;">You haven\'t added any prices yet.</p>')+
     '</div>';
 
     if (r){
@@ -1380,20 +1369,20 @@ try{
         var price = state.pantry[ing.name];
         var sub = (ing.grams/1000)*(price||0);
         return '<tr><td>'+ing.name+'</td><td class="gm-grams">'+fmt(ing.grams,0)+' g</td>'+
-          '<td class="gm-mono">'+(price===undefined ? '<span style="color:var(--danger);">sin precio</span>' : fmt(price,2)+' €/kg')+'</td>'+
+          '<td class="gm-mono">'+(price===undefined ? '<span style="color:var(--danger);">no price</span>' : fmt(price,2)+' €/kg')+'</td>'+
           '<td class="gm-mono" style="color:var(--gold);">'+fmt(sub,2)+' €</td></tr>';
       }).join('');
 
       out += '<div class="gm-card">'+
         recipePicker()+
-        '<h2 style="margin-top:10px;">Coste — '+r.name+'</h2>'+
-        (missing.length ? '<div class="gm-banner warn show">Faltan precios para: '+missing.join(', ')+'.</div>' : '')+
-        '<table class="gm-table"><thead><tr><th>Ingrediente</th><th>Peso</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>'+costRows+'</tbody></table>'+
+        '<h2 style="margin-top:10px;">Cost — '+r.name+'</h2>'+
+        (missing.length ? '<div class="gm-banner warn show">Missing prices for: '+missing.join(', ')+'.</div>' : '')+
+        '<table class="gm-table"><thead><tr><th>Ingredient</th><th>Weight</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>'+costRows+'</tbody></table>'+
         '<div class="gm-row" style="justify-content:space-between;margin-top:12px;align-items:flex-end;">'+
-          '<div class="gm-field"><label>Nº de piezas de la receta</label><input type="number" value="'+pieces+'" onchange="App.updateRecipeField(\''+r.id+'\',\'pieceCount\',this.value)" style="width:100px;"></div>'+
+          '<div class="gm-field"><label>Number of pieces in the recipe</label><input type="number" value="'+pieces+'" onchange="App.updateRecipeField(\''+r.id+'\',\'pieceCount\',this.value)" style="width:100px;"></div>'+
           '<div style="text-align:right;">'+
-            '<div class="gm-sub" style="margin:0;">Coste total</div><div class="gm-mono" style="font-size:18px;color:var(--gold);">'+fmt(cost,2)+' €</div>'+
-            '<div class="gm-sub" style="margin:6px 0 0 0;">Coste por pieza</div><div class="gm-mono" style="font-size:15px;">'+fmt(perPiece,2)+' €</div>'+
+            '<div class="gm-sub" style="margin:0;">Total cost</div><div class="gm-mono" style="font-size:18px;color:var(--gold);">'+fmt(cost,2)+' €</div>'+
+            '<div class="gm-sub" style="margin:6px 0 0 0;">Cost per piece</div><div class="gm-mono" style="font-size:15px;">'+fmt(perPiece,2)+' €</div>'+
           '</div>'+
         '</div>'+
       '</div>';
@@ -1405,30 +1394,30 @@ try{
   function render(){
     var app = document.getElementById('gm-app');
     if (!state.ready){
-      app.innerHTML = '<div style="padding:60px 24px;text-align:center;color:var(--text-muted);">Cargando tus recetas…</div>';
+      app.innerHTML = '<div style="padding:60px 24px;text-align:center;color:var(--text-muted);">Loading your recipes…</div>';
       return;
     }
 
     var tabs = [
-      {id:'calc', label:'Calculadora'},
-      {id:'recipes', label:'Recetas'},
-      {id:'schedule', label:'Cronograma'},
-      {id:'pantry', label:'Despensa'}
+      {id:'calc', label:'Calculator'},
+      {id:'recipes', label:'Recipes'},
+      {id:'schedule', label:'Schedule'},
+      {id:'pantry', label:'Pantry'}
     ];
 
     var html = '<div class="gm-header">'+
-      '<div class="gm-brand">'+icon('wheat')+'<div class="gm-brand-text"><h1>Aspai</h1><p>Porcentajes · recetas · cronograma</p></div></div>'+
+      '<div class="gm-brand">'+icon('wheat')+'<div class="gm-brand-text"><h1>Aspai</h1><p>Percentages · recipes · schedule</p></div></div>'+
       '<div class="gm-row" style="gap:6px;">'+
-        '<button class="gm-small" onclick="App.exportData()" title="Descargar tus recetas y precios en un archivo">⬇ Exportar</button>'+
-        '<label class="gm-small" style="cursor:pointer;display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:7px;padding:9px 14px;font-weight:600;font-size:13px;" title="Cargar un archivo exportado desde otro dispositivo">'+
-          '⬆ Importar<input type="file" accept="application/json" style="display:none" onchange="App.importData(this)">'+
+        '<button class="gm-small" onclick="App.exportData()" title="Download your recipes and prices as a file">⬇ Export</button>'+
+        '<label class="gm-small" style="cursor:pointer;display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:7px;padding:9px 14px;font-weight:600;font-size:13px;" title="Load a file exported from another device">'+
+          '⬆ Import<input type="file" accept="application/json" style="display:none" onchange="App.importData(this)">'+
         '</label>'+
       '</div>'+
     '</div>'+
       '<div class="gm-body" style="padding-bottom:0;padding-top:14px;">'+
         '<div class="gm-recipe-pick">'+
-          '<button class="gm-recipe-btn '+(state.division==='panaderia'?'active':'')+'" onclick="App.setDivision(\'panaderia\')">🍞 Panadería</button>'+
-          '<button class="gm-recipe-btn '+(state.division==='pasteleria'?'active':'')+'" onclick="App.setDivision(\'pasteleria\')">🍰 Pastelería</button>'+
+          '<button class="gm-recipe-btn '+(state.division==='panaderia'?'active':'')+'" onclick="App.setDivision(\'panaderia\')">🍞 Bakery</button>'+
+          '<button class="gm-recipe-btn '+(state.division==='pasteleria'?'active':'')+'" onclick="App.setDivision(\'pasteleria\')">🍰 Pastry</button>'+
         '</div>'+
       '</div>'+
       '<div class="gm-tabs">'+tabs.map(function(t){
@@ -1450,28 +1439,28 @@ try{
   loadAll();
 
 }catch(err){
-  // Si algo falla durante la carga inicial, no dejamos la página en blanco:
-  // mostramos el error en pantalla y en la consola para poder depurarlo.
-  console.error('Error al iniciar Aspai:', err);
+  // If something fails during initial load, don't leave a blank page:
+  // show the error on screen and in the console so it can be debugged.
+  console.error('Error starting Aspai:', err);
   var el = document.getElementById('gm-app');
   if (el){
     el.innerHTML = '<div style="padding:40px 24px;font-family:sans-serif;color:#F3E7D3;background:#18120D;">'+
-      '<h2 style="font-family:Georgia,serif;color:#E3A83B;">Aspai no ha podido cargar</h2>'+
-      '<p>Ha ocurrido un error al iniciar la aplicación. Abre la consola del navegador (F12 → Console) para ver el detalle.</p>'+
+      '<h2 style="font-family:Georgia,serif;color:#E3A83B;">Aspai failed to load</h2>'+
+      '<p>Something went wrong while starting the app. Open the browser console (F12 → Console) for details.</p>'+
       '<pre style="white-space:pre-wrap;background:#241B14;padding:12px;border-radius:8px;color:#E39C88;font-size:12px;">'+
       (err && (err.stack || err.message) || String(err)) + '</pre></div>';
   }
 }
 
-// Red de seguridad adicional: si un error posterior (fuera de la carga inicial)
-// impide que la app llegue a pintarse nunca, avisamos en pantalla en vez de
-// dejarla en blanco sin explicación.
+// Extra safety net: if a later error (outside the initial load) keeps the
+// app from ever rendering, show something on screen instead of a silent
+// blank page.
 window.addEventListener('error', function(e){
   var el = document.getElementById('gm-app');
   if (el && el.innerHTML.trim() === ''){
     el.innerHTML = '<div style="padding:40px 24px;font-family:sans-serif;color:#F3E7D3;background:#18120D;">'+
-      '<h2 style="font-family:Georgia,serif;color:#E3A83B;">Aspai no ha podido cargar</h2>'+
-      '<p>Error: '+ (e && e.message ? e.message : 'desconocido') +'</p></div>';
+      '<h2 style="font-family:Georgia,serif;color:#E3A83B;">Aspai failed to load</h2>'+
+      '<p>Error: '+ (e && e.message ? e.message : 'unknown') +'</p></div>';
   }
 });
 
