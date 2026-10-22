@@ -90,6 +90,8 @@ try{
     scaleMode: 'flour',
     scaleValue: 1000,
     scaleUnits: 4,
+    inventory: {},
+    plan: {},
     ready: false
   };
 
@@ -1236,6 +1238,87 @@ try{
         version = 14;
       }
 
+      if (version < 15){
+        if (!state.recipes.some(function(r){ return r.name === 'Pan Terreta'; })){
+          state.recipes.push({
+            id: uid('r'), name:'Pan Terreta', division:'panaderia', pieceWeight:0, pieceCount:0,
+            notes:'Amasado en dos fases: autólisis de 1 hora con las harinas y el agua; después segundo amasado con sal, masa madre y el resto del agua (1.500 g).',
+            ingredients:[
+              {id:uid('i'), name:'Harina FC', grams:3000, cat:'flour'},
+              {id:uid('i'), name:'Harina de fuerza', grams:2000, cat:'flour'},
+              {id:uid('i'), name:'Harina T80', grams:3000, cat:'flour'},
+              {id:uid('i'), name:'Harina de centeno', grams:2000, cat:'flour'},
+              {id:uid('i'), name:'Agua (autólisis)', grams:7500, cat:'water'},
+              {id:uid('i'), name:'Agua (2º amasado)', grams:1500, cat:'water'},
+              {id:uid('i'), name:'Sal', grams:200, cat:'salt'},
+              {id:uid('i'), name:'Masa madre', grams:3000, cat:'leaven'}
+            ],
+            schedule:[
+              {id:uid('s'), dia:'Día 1', hora:'09:00', paso:'Autólisis (harinas + 7.500 g agua)', amasado:'—', temp:'—', min:60, notas:''},
+              {id:uid('s'), dia:'Día 1', hora:'10:00', paso:'Segundo amasado (+ 1.500 g agua, sal, masa madre)', amasado:'—', temp:'—', min:0, notas:''}
+            ]
+          });
+        }
+        version = 15;
+      }
+
+      if (version < 16){
+        var ter = state.recipes.find(function(r){ return r.name === 'Pan Terreta'; });
+        if (ter){
+          ter.schedule.forEach(function(s){
+            if (s.paso.indexOf('Segundo amasado') === 0){
+              s.amasado = '9 min lenta + 5 min rápida'; s.temp = '24 °C'; s.min = 14;
+              s.notas = '9 min en velocidad lenta y 5 min en rápida. Temperatura final de la masa: 24 °C';
+            }
+          });
+        }
+        version = 16;
+      }
+
+      if (version < 17){
+        // Producción semanal de Panadería (hoja de referencia). Cantidades en kg de harina.
+        var SEM = [
+          ['Pan de Calabaza',[4,4,4,4,4,3,3]], ['Pan Tritordeum',[4,4,4,4,3,3,4]],
+          ['Masa Madre',[[25,30],[25,30],[25,30],[25,35],[15,25],[15,20],[25,30]]],
+          ['Pan Terreta',[10,10,10,10,10,10,10]], ['Centeno 60/40',[3,3,3,3,3,3,3]],
+          ['Pan de Avena',[0,3,0,3,0,0,0]], ['Pan de Algarroba',[0,3,0,3,0,0,0]], ['Centeno 100%',[18,0,18,0,0,0,0]],
+          ['Espelta',[7,7,7,4,3,8,7]], ['Integral',[18,18,16,14,12,18,18]], ['Trigo Duro',[3,3,3,3,3,4,3]],
+          ['Sarraceno 60/40',[3,3,3,3,3,4,3]], ['Maíz',[5,5,5,3,3,5,5]], ['Aspai',[14,14,14,14,12,12,14]],
+          ['Tradición',[16,0,0,0,0,0,0]], ['Barra Integral',[10,0,0,0,0,0,0]], ['Pan de Leche',[7,7,7,7,7,7,7]]
+        ];
+        var curPlan = (state.plan && state.plan.panaderia) || [];
+        if (!curPlan.some(function(x){ return x.done; })){
+          var np = [];
+          SEM.forEach(function(row){
+            var rec = state.recipes.filter(function(r){ return r.name === row[0] && (r.division||'panaderia') === 'panaderia'; })[0];
+            if (!rec) return;
+            row[1].forEach(function(v,d){
+              [].concat(v).forEach(function(u){
+                if (u > 0) np.push({id:uid('p'), day:['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][d], rid:rec.id, units:u, mode:'flour', done:false});
+              });
+            });
+          });
+          state.plan = state.plan || {}; state.plan.panaderia = np;
+          try{ localStorage.setItem('gm_plan', JSON.stringify(state.plan)); }catch(e){}
+        }
+        version = 17;
+      }
+
+      if (version < 18){
+        // Valencia Directa y Valencia Fría van primero en la tabla semanal de Panadería.
+        state.plan = state.plan || {}; var pp = state.plan.panaderia || [], front = [];
+        ['Valencia Directa','Valencia Fría'].forEach(function(nm){
+          var rec = state.recipes.filter(function(r){ return r.name === nm && (r.division||'panaderia') === 'panaderia'; })[0];
+          if (!rec) return;
+          var mine = pp.filter(function(x){ return x.rid === rec.id; });
+          pp = pp.filter(function(x){ return x.rid !== rec.id; });
+          front = front.concat(mine.length ? mine : [{id:uid('p'), day:'Lunes', rid:rec.id, units:0, mode:'flour', done:false}]);
+        });
+        state.plan.panaderia = front.concat(pp);
+        try{ localStorage.setItem('gm_plan', JSON.stringify(state.plan)); }catch(e){}
+        version = 18;
+      }
+
       persistRecipes();
       try{ storage.set('gm_seed_version', String(version)); }catch(e){}
     }).catch(function(){});
@@ -1284,6 +1367,7 @@ try{
       if (pantryRes && pantryRes.value){
         try{ state.pantry = JSON.parse(pantryRes.value); }catch(e){ state.pantry = {}; }
       }
+      try{ state.inventory = JSON.parse(localStorage.getItem('gm_inv')||'{}'); state.plan = JSON.parse(localStorage.getItem('gm_plan')||'{}'); state.suppliers = JSON.parse(localStorage.getItem('gm_sup')||'{}'); }catch(e){}
       return applyMigrations();
     }).then(function(){
       ensureActiveInDivision();
@@ -1961,6 +2045,168 @@ try{
     return out;
   }
 
+  /* ===== INVENTARIO + PRODUCCIÓN SEMANAL (por división) ===== */
+  var DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  function saveExtra(){ try{ localStorage.setItem('gm_inv', JSON.stringify(state.inventory)); localStorage.setItem('gm_plan', JSON.stringify(state.plan)); localStorage.setItem('gm_sup', JSON.stringify(state.suppliers||{})); }catch(e){} }
+  function inv(){ return state.inventory[state.division] || (state.inventory[state.division] = {}); }
+  function plan(){ return state.plan[state.division] || (state.plan[state.division] = []); }
+  function q(n){ return encodeURIComponent(n).replace(/'/g,'%27'); }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  function batchFactor(r,u,m){
+    if (m==='flour') return u*1000/(totalFlour(r)||1);
+    if (m==='dough') return u*1000/(totalDough(r)||1);
+    return r.pieceCount>0 ? u/r.pieceCount : u;
+  }
+  function unitLabel(r,x){
+    if (x.mode==='flour') return ' kg harina';
+    if (x.mode==='dough') return ' kg masa';
+    return r.pieceCount>0 ? ' pzas' : ' tandas';
+  }
+  function consume(r,u,sign,m){
+    var f = batchFactor(r,u,m)*sign, i = inv();
+    r.ingredients.forEach(function(g){ i[g.name] = Math.round(((i[g.name]||0) - g.grams*f)*10)/10; });
+  }
+  window.App.setInv = function(n,v){ inv()[decodeURIComponent(n)] = Number(v)||0; saveExtra(); render(); };
+  window.App.delInv = function(n){ delete inv()[decodeURIComponent(n)]; saveExtra(); render(); };
+  window.App.addInv = function(){
+    var n = document.getElementById('gm-inv-new').value.trim(); if(!n) return;
+    inv()[n] = Number(document.getElementById('gm-inv-qty').value)||0; saveExtra(); render();
+  };
+  window.App.detectInv = function(){
+    var i = inv();
+    visibleDivRecipes().forEach(function(r){ r.ingredients.forEach(function(g){ if(i[g.name]===undefined) i[g.name]=0; }); });
+    saveExtra(); render();
+  };
+  function visibleDivRecipes(){ return state.recipes.filter(function(r){ return recipeDivision(r)===state.division; }); }
+  window.App.produceNow = function(rid){
+    var r = getRecipe(rid), u = Number(document.getElementById('gm-q-units').value)||0;
+    if(!r || u<=0) return;
+    consume(r,u,1); saveExtra(); state.tab='inv'; render();
+  };
+  window.App.addPlan = function(){
+    var rid = document.getElementById('gm-plan-recipe').value; if(!rid) return;
+    plan().push({id:uid('p'), day:document.getElementById('gm-plan-day').value, rid:rid, units:Number(document.getElementById('gm-plan-units').value)||1, mode:document.getElementById('gm-plan-mode').value, done:false});
+    saveExtra(); render();
+  };
+  window.App.delPlan = function(id){
+    var p = plan(), x = p.filter(function(y){return y.id===id;})[0];
+    if(x && x.done){ var r=getRecipe(x.rid); if(r) consume(r,x.units,-1,x.mode); }
+    state.plan[state.division] = p.filter(function(y){return y.id!==id;}); saveExtra(); render();
+  };
+  window.App.producePlan = function(id){
+    var x = plan().filter(function(y){return y.id===id;})[0]; if(!x) return;
+    var r = getRecipe(x.rid); if(!r) return;
+    consume(r, x.units, x.done ? -1 : 1, x.mode); x.done = !x.done; saveExtra(); render();
+  };
+  function renderQuick(){
+    var r = getRecipe(state.activeId); if(!r) return '';
+    return '<div class="gm-card"><div class="gm-row" style="justify-content:space-between;"><div><h2 style="margin:0;">Producir ahora</h2>'+
+      '<p class="gm-sub">Descuenta los ingredientes de esta receta del inventario de '+divisionLabel(state.division)+'.</p></div>'+
+      '<div class="gm-row"><input id="gm-q-units" type="number" value="'+state.scaleUnits+'" style="width:80px;">'+
+      '<button class="gm-primary" onclick="App.produceNow(\''+r.id+'\')">Descontar</button></div></div></div>';
+  }
+  function renderInv(){
+    var i = inv(), names = Object.keys(i).sort();
+    var rows = names.map(function(n){
+      var v = i[n];
+      return '<tr><td>'+esc(n)+'</td><td><input type="number" step="any" value="'+v+'" style="width:100px;" onchange="App.setInv(\''+q(n)+'\',this.value)"> g</td>'+
+        '<td style="color:var(--danger);">'+(v<0?'Faltan '+fmt(-v,0)+' g':'')+'</td>'+
+        '<td><button class="gm-ghost" onclick="App.delInv(\''+q(n)+'\')">✕</button></td></tr>';
+    }).join('');
+    return '<div class="gm-card"><div class="gm-row" style="justify-content:space-between;"><div><h2 style="margin:0;">Inventario — '+divisionLabel(state.division)+'</h2>'+
+      '<p class="gm-sub">Stock en gramos. Se descuenta al producir una receta o marcar un día de la semana.</p></div>'+
+      '<button class="gm-small" onclick="App.detectInv()">Detectar de recetas</button></div>'+
+      '<div class="gm-row" style="margin:12px 0;"><input id="gm-inv-new" type="text" placeholder="Producto" style="flex:1;min-width:140px;">'+
+      '<input id="gm-inv-qty" type="number" placeholder="g" style="width:90px;"><button class="gm-small gm-primary" onclick="App.addInv()">+ Añadir</button></div>'+
+      (rows ? '<table class="gm-table"><thead><tr><th>Producto</th><th>Stock</th><th></th><th></th></tr></thead><tbody>'+rows+'</tbody></table>' : '<p class="gm-sub">Sin productos. Pulsa «Detectar de recetas» para cargarlos.</p>')+'</div>';
+  }
+  function sup(){ return state.suppliers || (state.suppliers = {}); }
+  window.App.setSup = function(n,v){ sup()[decodeURIComponent(n)] = v.trim(); saveExtra(); render(); };
+  function orderCard(need){
+    if (!Object.keys(need).length) return '';
+    var i = inv(), total = 0, groups = {}, rows = '';
+    Object.keys(need).sort().forEach(function(n){
+      var s = i[n]||0, miss = need[n]-s; if (miss<=0) return;
+      var kg = miss/1000, price = state.pantry[n], cost = kg*(price||0), sp = sup()[n]||'';
+      total += cost;
+      var k = sp || 'Sin proveedor asignado'; (groups[k] = groups[k]||[]).push('- '+n+': '+fmt(kg,2)+' kg');
+      rows += '<tr><td>'+esc(n)+'</td><td class="gm-grams">'+fmt(need[n]/1000,2)+'</td><td class="gm-grams">'+fmt(s/1000,2)+'</td>'+
+        '<td class="gm-grams" style="color:var(--gold);font-weight:600;">'+fmt(kg,2)+' kg</td>'+
+        '<td><input type="text" value="'+esc(sp)+'" placeholder="Proveedor" style="width:130px;" onchange="App.setSup(\''+q(n)+'\',this.value)"></td>'+
+        '<td class="gm-mono">'+(price===undefined ? '<span class="gm-sub">sin precio</span>' : fmt(cost,2)+' €')+'</td></tr>';
+    });
+    var txt = 'Pedido — '+divisionLabel(state.division)+'\n';
+    Object.keys(groups).sort().forEach(function(k){ txt += '\n'+k+':\n'+groups[k].join('\n')+'\n'; });
+    return '<div class="gm-card"><h2>Pedido a proveedores</h2>'+
+      '<p class="gm-sub">Ingredientes de la producción pendiente menos el stock del inventario, en kg. Los precios salen de la Despensa.</p>'+
+      (rows ? '<table class="gm-table"><thead><tr><th>Producto</th><th>Necesario (kg)</th><th>Stock (kg)</th><th>A pedir</th><th>Proveedor</th><th>Coste est.</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+        '<div class="gm-row" style="justify-content:flex-end;margin:10px 0;"><span class="gm-sub" style="margin:0;">Coste estimado del pedido</span><span class="gm-mono" style="font-size:16px;color:var(--gold);">'+fmt(total,2)+' €</span></div>'+
+        '<textarea readonly style="width:100%;min-height:120px;" onclick="this.select()">'+esc(txt)+'</textarea>'
+        : '<p class="gm-sub" style="margin-top:10px;">Con el stock actual no hace falta pedir nada.</p>')+'</div>';
+  }
+  function cellEntries(rid,d){ return plan().filter(function(x){ return x.rid===rid && x.day===d; }); }
+  function rowMode(rid){ return (plan().filter(function(x){ return x.rid===rid; })[0]||{}).mode || 'flour'; }
+  window.App.setCell = function(rid,d,txt){
+    var mode = rowMode(rid);
+    var vals = String(txt).replace(/,/g,'.').split('+').map(Number).filter(function(n){ return n>0; });
+    state.plan[state.division] = plan().filter(function(x){ return !(x.rid===rid && x.day===d && !x.done); });
+    if (!vals.length && !plan().some(function(x){ return x.rid===rid; })) vals = [0];
+    vals.forEach(function(u){ plan().push({id:uid('p'), day:d, rid:rid, units:u, mode:mode, done:false}); });
+    saveExtra(); render();
+  };
+  window.App.setMode = function(rid,m){ plan().forEach(function(x){ if(x.rid===rid && !x.done) x.mode = m; }); saveExtra(); render(); };
+  window.App.addRow = function(){
+    var rid = document.getElementById('gm-plan-recipe').value;
+    if (!rid || plan().some(function(x){ return x.rid===rid; })) return;
+    plan().push({id:uid('p'), day:'Lunes', rid:rid, units:0, mode:'flour', done:false}); saveExtra(); render();
+  };
+  window.App.delRow = function(rid){
+    plan().forEach(function(x){ if(x.rid===rid && x.done){ var r=getRecipe(rid); if(r) consume(r,x.units,-1,x.mode); } });
+    state.plan[state.division] = plan().filter(function(x){ return x.rid!==rid; }); saveExtra(); render();
+  };
+  window.App.produceDay = function(d){
+    var items = plan().filter(function(x){ return x.day===d && x.units>0; });
+    var allDone = items.length>0 && items.every(function(x){ return x.done; });
+    items.forEach(function(x){
+      var r = getRecipe(x.rid); if(!r) return;
+      if (allDone){ consume(r,x.units,-1,x.mode); x.done = false; }
+      else if (!x.done){ consume(r,x.units,1,x.mode); x.done = true; }
+    });
+    saveExtra(); render();
+  };
+  var ROW_COLORS = {'Valencia Directa':['rgba(76,175,80,.18)','#7FD483'], 'Valencia Fría':['rgba(66,133,244,.20)','#7FB0F5'], 'Pan de Calabaza':['rgba(245,140,40,.20)','#F5A353'], 'Pan Tritordeum':['rgba(245,140,40,.20)','#F5A353'], 'Masa Madre':['rgba(150,100,60,.30)','#C99B6D'], 'Pan Terreta':['rgba(160,160,165,.22)','#BDBDC2'], 'Centeno 60/40':['rgba(217,60,60,.25)','#F08A8A'], 'Centeno 100%':['rgba(217,60,60,.25)','#F08A8A'], 'Pan de Avena':['rgba(255,255,255,.14)','#FFFFFF'], 'Pan de Algarroba':['rgba(150,90,200,.26)','#BA97E3'], 'Espelta':['rgba(240,210,20,.34)','#F5DC3A'], 'Sarraceno 60/40':['rgba(240,210,20,.34)','#F5DC3A'], 'Integral':['rgba(240,210,20,.34)','#F5DC3A'], 'Trigo Duro':['rgba(240,210,20,.34)','#F5DC3A'], 'Maíz':['rgba(240,210,20,.34)','#F5DC3A'], 'Aspai':['rgba(220,40,40,.46)','#FF8080'], 'Tradición':['rgba(220,40,40,.46)','#FF8080'], 'Barra Integral':['rgba(220,40,40,.46)','#FF8080']};
+  function renderPlan(){
+    var p = plan(), need = {}, rids = [];
+    p.forEach(function(x){
+      if (rids.indexOf(x.rid)<0) rids.push(x.rid);
+      if (x.done) return; var r = getRecipe(x.rid); if(!r) return;
+      var f = batchFactor(r,x.units,x.mode); r.ingredients.forEach(function(g){ need[g.name] = (need[g.name]||0) + g.grams*f; });
+    });
+    var MODES = [['flour','kg harina'],['dough','kg masa'],['pieces','piezas']];
+    var rows = rids.map(function(rid){
+      var r = getRecipe(rid); if(!r) return '';
+      var mode = rowMode(rid), tot = 0;
+      var cells = DAYS.map(function(d){
+        var es = cellEntries(rid,d).filter(function(x){ return x.units>0; }), anyDone = es.some(function(x){ return x.done; });
+        es.forEach(function(x){ tot += x.units; });
+        return '<td style="padding:3px;"><input type="text" value="'+es.map(function(x){return x.units;}).join('+')+'" '+(anyDone?'disabled ':'')+'style="width:62px;text-align:center;'+(anyDone?'opacity:.5;':'')+'" onchange="App.setCell(\''+rid+'\',\''+d+'\',this.value)"></td>';
+      }).join('');
+      var rc = ROW_COLORS[r.name];
+      return '<tr'+(rc?' style="background:'+rc[0]+';"':'')+'><td style="white-space:nowrap;'+(rc?'color:'+rc[1]+';font-weight:600;':'')+'">'+esc(r.name)+'</td><td><select onchange="App.setMode(\''+rid+'\',this.value)">'+
+        MODES.map(function(m){ return '<option value="'+m[0]+'"'+(m[0]===mode?' selected':'')+'>'+m[1]+'</option>'; }).join('')+'</select></td>'+cells+
+        '<td class="gm-mono">'+fmt(tot,1)+'</td><td><button class="gm-ghost" onclick="App.delRow(\''+rid+'\')">\u2715</button></td></tr>';
+    }).join('');
+    var foot = '<tr><td style="color:var(--text-muted);">Producir d\u00eda</td><td></td>'+DAYS.map(function(d){
+      var its = p.filter(function(x){ return x.day===d && x.units>0; }), all = its.length>0 && its.every(function(x){ return x.done; });
+      return '<td style="padding:3px;text-align:center;">'+(its.length?'<button class="gm-small '+(all?'':'gm-primary')+'" title="'+(all?'Deshacer':'Producir')+' '+d+'" onclick="App.produceDay(\''+d+'\')">'+(all?'\u21b6':'\u2713')+'</button>':'')+'</td>';
+    }).join('')+'<td></td><td></td></tr>';
+    var opts = visibleDivRecipes().filter(function(r){ return rids.indexOf(r.id)<0; }).map(function(r){ return '<option value="'+r.id+'">'+esc(r.name)+'</option>'; }).join('');
+    return '<div class="gm-card"><h2>Producci\u00f3n semanal \u2014 '+divisionLabel(state.division)+'</h2>'+
+      '<p class="gm-sub">Escribe la cantidad de cada d\u00eda (usa 25+30 para varias tandas). \u00abProducir d\u00eda\u00bb descuenta del inventario; \u21b6 lo devuelve.</p>'+
+      '<div style="overflow-x:auto;margin-top:10px;"><table class="gm-table"><thead><tr><th>Receta</th><th>Unidad</th>'+DAYS.map(function(d){ return '<th style="text-align:center;">'+(d==='Miércoles'?'X':d.charAt(0))+'</th>'; }).join('')+'<th>Total</th><th></th></tr></thead><tbody>'+rows+foot+'</tbody></table></div>'+
+      '<div class="gm-row" style="margin-top:12px;"><select id="gm-plan-recipe" style="flex:1;min-width:160px;">'+opts+'</select><button class="gm-small gm-primary" onclick="App.addRow()">+ A\u00f1adir receta</button></div></div>'+orderCard(need);
+  }
+
   function render(){
     var app = document.getElementById('gm-app');
     if (!state.ready){
@@ -1972,7 +2218,9 @@ try{
       {id:'calc', label:'Calculadora'},
       {id:'recipes', label:'Recetas'},
       {id:'schedule', label:'Cronograma'},
-      {id:'pantry', label:'Despensa'}
+      {id:'pantry', label:'Despensa'},
+      {id:'inv', label:'Inventario'},
+      {id:'plan', label:'Semana'}
     ];
 
     var html = '<div class="gm-header">'+
@@ -1996,7 +2244,9 @@ try{
       }).join('')+'</div>'+
       '<div class="gm-body">';
 
-    if (state.tab==='calc') html += renderCalc();
+    if (state.tab==='calc') html += renderCalc() + renderQuick();
+    else if (state.tab==='inv') html += renderInv();
+    else if (state.tab==='plan') html += renderPlan();
     else if (state.tab==='recipes') html += renderRecipes();
     else if (state.tab==='schedule') html += renderSchedule();
     else if (state.tab==='pantry') html += renderPantry();
